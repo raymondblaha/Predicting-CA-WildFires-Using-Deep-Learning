@@ -1,0 +1,61 @@
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\title{Final Project Proposal}
+\author{Raymond Blaha and Paul Hwang}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction / Question}
+Can we predict wildfire risk zones using historical wildfire, vegetation, and climate data in the califorina region?
+
+\section{Data}
+The data for this study will be collated from the following sources (At the current moment. Subject to change.):
+\begin{enumerate}
+  \item Historical Wildfire Data: \url{https://modis.gsfc.nasa.gov/data/dataprod/mod14.php}
+  \item Vegetation Data: \url{https://www.usgs.gov/core-science-systems/science-analytics-and-synthesis/gap/science/land-cover-data-download?qt-science_center_objects=0#qt-science_center_objects}
+  \item Climate Data: \url{https://www.ncdc.noaa.gov/cdo-web/}
+\end{enumerate}
+
+\section{Project Outline}
+
+\subsection{Objective}
+identifying high-risk wildfire zones using historical data. 
+
+To approach this problem, an autoencoder will be used to extract key features from complex data, 
+and a CNN will analyze spatial correlations from the satellite imagery. 
+Finally, we can use the LSTM to take into account the temporal climate instances to predict wildfire risk zones.
+
+\subsection{Data Visualization}
+Data will be visualized to directly support the modeling process, using Python libraries to:
+\begin{enumerate}
+    \item Display extracted features from the autoencoder.
+    \item Visualize patterns identified by the CNN and present the predictions.
+    \item Visualize the LSTM predictions given the historical climate data.
+\end{enumerate}
+
+\subsection{Modeling}
+\subsubsection{Autoencoder}
+The autoencoder will be used to extract key features from complex data,  such as satellite imagery, to reduce noise and improve model performance.
+
+\subsubsection{CNN}
+The CNN will then analyze these features to identify spatial patterns that will be key for predicting wildfire risk zones.
+
+\subsection{LSTM}
+The LSTM will be used to take into account the temporal climate instances which will give the model more context to predict wildfire risk zones.
+
+\subsection{Visualization of Results}
+Results will be presented in a simple format, such as risk zone maps based on the CNN analysis.
+
+\section{Conclusion}
+This project will yield:
+\begin{enumerate}
+    \item An autoencoder-CNN-LSTM integrated model for wildfire risk prediction.
+    \item Clear visualizations that illustrate the model's predictive capabilities.
+\end{enumerate}
+
+\end{document}
