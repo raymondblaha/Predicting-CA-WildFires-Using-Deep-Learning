@@ -1,0 +1,230 @@
+---
+title: "Deep Learning"
+author: "Paul"
+date: "2023-12-04"
+output: pdf_document
+---
+
+# Simple cali stuff
+
+
+```{r}
+library(dplyr)
+library(stringr)
+library(data.table)
+library(tidyr)
+library(data.table)
+library(sf)
+library(lubridate)
+```
+
+
+```{r}
+file1 <- "/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/01.01.2000 - 07.11.2005.csv"
+file2 <- "/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/climate_data.csv"
+file3 <- "/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/02.22.2011- 12.31.2017.csv"
+file4 <- "/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/01.01.2018 - 12.31.2023.csv"
+file5 <- "/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/processed_combined_with_ecosystem.csv"
+file_path <- "/Users/welpp/Desktop/Advanced Applied Computing/Machine/ghcnd_stations.csv"
+
+data_1 <- read.csv(file1)
+data_2 <- read.csv(file2)
+data_3 <- read.csv(file3)
+data_4 <- read.csv(file4)
+data_fire <- read.csv(file5)
+data_station <- read.csv(file_path)
+```
+
+```{r}
+data_cali <- data_station %>% filter(State == "CA")
+
+data_climate <- rbind(data_1, data_2)
+data_climate <- rbind(data_climate, data_3)
+data_climate <- rbind(data_climate, data_4)
+```
+
+
+```{r}
+data_climate <- data_climate %>% select(-c(attributes)) %>%
+  mutate(station = str_remove(station, "GHCND:")) %>% 
+  filter(datatype %in% c("TMIN", "TMAX", "PRCP", "SNWD", "TAVG", "SNOW"))
+  
+data_cali <- data_cali %>% select(-c(State, Name, GSN.Flag, HCN.CRN.Flag, WMO.ID))
+```
+
+```{r}
+data_merge <- inner_join(data_climate, data_cali, by = c("station" = "ID"))
+```
+
+
+```{r}
+write.csv(data_merge, file = "/Users/welpp/Desktop/Advanced Applied Computing/Machine/merge_data.csv", row.names = FALSE)
+```
+
+```{r}
+data_merge <- fread("/Users/welpp/Desktop/Advanced Applied Computing/Machine/merge_data.csv")
+data_fire <- fread("/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/processed_combined_with_ecosystem.csv")
+data_fire2 <- fread("/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/California_Fire_Incidents.csv")
+```
+
+
+# accounting counties
+
+```{r}
+california_counties <- st_read("/Users/welpp/Desktop/Advanced Applied Computing/Machine/California_Counties/cnty19_1_basicplus.shp")
+```
+
+```{r}
+# Create a spatial points data frame from your_data
+your_data_sf <- st_as_sf(data_merge, coords = c("Longitude", "Latitude"), crs = 4326)
+
+# Perform a spatial join
+joined_data <- st_join(your_data_sf, california_counties)
+
+# Extract the county information and add it to your_data
+data_merge$`CountyName` <- joined_data$COUNTY_NAM
+data_merge$`CountyCode` <- joined_data$COUNTY_COD
+
+write.csv(data_merge, file = "/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/climate_merge_sv1.csv", row.names = FALSE)
+
+#data_merge2 <- data_merge %>% select(-c(station, Latitude, Longitude))
+```
+
+```{r}
+data_merge <- fread("/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/climate_merge_sv1.csv")
+```
+
+
+```{r}
+data_merge <- data_merge %>% select(-c(station, Latitude, Longitude))
+
+data_merge2 <- data_merge %>% group_by(date, CountyCode, CountyName, datatype) %>%
+  summarize(
+    Elevation = mean(Elevation),
+    value = mean(value)
+  )
+
+data_merge3 <- data_merge2 %>% 
+  pivot_wider(id_cols = c("date", "CountyCode", "CountyName"),
+              names_from = "datatype",
+              values_from = "value",
+              values_fn = list(value = function(x) x[1]))
+
+data_merge4 <- data_merge2 %>% group_by(date, CountyCode, CountyName) %>%
+  summarize(Elevation = mean(Elevation))
+
+data_merge3$Elevation <- data_merge4$Elevation
+data_merge3 <- data_merge3 %>% mutate(date = as.Date(date))
+```
+
+
+
+
+```{r}
+data_fire_prep <- data_fire %>% filter(FireOccurrence == 1) %>%
+  select(-c(index_right, geometry)) %>%
+  mutate(Timestamp = as.Date(Timestamp))
+
+# Create a spatial points data frame from your_data
+your_data_sf2 <- st_as_sf(data_fire_prep, coords = c("Longitude", "Latitude"), crs = 4326)
+
+# Perform a spatial join
+joined_data <- st_join(your_data_sf2, california_counties)
+
+# Extract the county information and add it to your_data
+data_fire_prep$`CountyName` <- joined_data$COUNTY_NAM
+data_fire_prep$`CountyCode` <- joined_data$COUNTY_COD
+data_fire_prep$Fire <- 1
+
+data_county_final <- left_join(data_merge3, data_fire_prep, 
+                                  by = c("date" = "Timestamp", 
+                                         "CountyName"="CountyName")) %>%
+  select(-c(CountyCode.y)) %>% filter(!is.na(CountyName)) %>%
+  rename(CountyCode = CountyCode.x) %>%
+  mutate(Fire = ifelse(is.na(Fire), 0, Fire))
+
+```
+
+```{r}
+# write.csv(data_county_final, 
+#           file = "/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/data_county_final.csv", 
+#           row.names = FALSE)
+
+write.csv(data_county_final, 
+          file = "/Users/welpp/Desktop/Advanced Applied Computing/Machine/DataFile2/data_county_final2.csv", 
+          row.names = FALSE)
+```
+
+
+
+
+```{r}
+california_counties <- st_read("/Users/welpp/Desktop/Advanced Applied Computing/Machine/California_Counties/cnty19_1_basicplus.shp")
+```
+
+```{r}
+# Create a spatial points data frame from your_data
+your_data_sf <- st_as_sf(data_merge, coords = c("Longitude", "Latitude"), crs = 4326)
+
+# Perform a spatial join
+joined_data <- st_join(your_data_sf, california_counties)
+
+# Extract the county information and add it to your_data
+data_merge$`CountyName` <- joined_data$COUNTY_NAM
+data_merge$`CountyCode` <- joined_data$COUNTY_COD
+
+data_merge_final <- data_merge %>% select(-c(station, Latitude, Longitude))
+```
+
+
+
+
+# entire california
+
+```{r}
+data_test <- data_merge %>% select(-c(station, Latitude, Longitude)) %>% 
+  group_by(date, datatype) %>% summarize(
+    Elevation = mean(Elevation, na.rm = TRUE),
+    value = mean(value, na.rm = TRUE))
+
+data_cali_wide <- data_test %>% pivot_wider(names_from = datatype, id_cols = date, 
+                          values_from = value, values_fill = list(value = NULL))
+
+data_cali_wide$date <- as.Date(data_cali_wide$date)
+
+fire_time <- data_fire %>% filter(FireOccurrence == 1) %>%
+  select(Timestamp) %>% 
+  mutate(Timestamp = as.Date(Timestamp)) %>%
+  distinct(Timestamp)
+
+fire_time$Fire <- 1
+
+data_cali_full_final <- left_join(data_cali_wide, fire_time, 
+                                  by = c("date" = "Timestamp")) %>%
+  mutate(Fire = ifelse(is.na(Fire), 0, Fire))
+
+write.csv(data_cali_full_final, file =  "/Users/welpp/Desktop/Advanced Applied Computing/Machine/climate_cali_all.csv", row.names = FALSE)
+
+## fire two is from different source of data
+
+fire_time2 <- data_fire2 %>% 
+  select(Started) %>% 
+  mutate(Started = as.Date(Started)) %>%
+  distinct(Started)
+
+data_fire2 %>% select(Started) %>% arrange(Started)
+
+fire_time2 <- data_fire2 %>% 
+  filter(as.Date(Started) > as.Date("2010-01-01")) %>%
+  filter(as.Date(Started) <= as.Date(Extinguished)) %>%
+  rowwise() %>%
+  mutate(dates_within_range = list(seq(as.Date(Started), 
+                                       as.Date(Extinguished), by = "day"))) %>%
+  unnest(dates_within_range) %>% select(dates_within_range) %>%
+  distinct(dates_within_range) %>% arrange(dates_within_range)
+
+data_fire %>% select(FireOccurrence) %>% count(FireOccurrence)
+
+write.csv(data_cali_wide, file =  "/Users/welpp/Desktop/Advanced Applied Computing/Machine/merge_step1.csv", row.names = FALSE)
+```
+
